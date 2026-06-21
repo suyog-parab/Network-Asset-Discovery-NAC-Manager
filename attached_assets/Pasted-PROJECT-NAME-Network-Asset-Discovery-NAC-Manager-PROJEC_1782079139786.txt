@@ -1,0 +1,619 @@
+PROJECT NAME
+
+Network Asset Discovery & NAC Manager
+
+⸻
+
+PROJECT GOAL
+
+Create a centralized network asset discovery and NAC management platform capable of:
+
+1. Discovering network devices automatically.
+2. Building a complete asset inventory.
+3. Mapping devices to users.
+4. Approving devices.
+5. Syncing approved devices to FreeRADIUS.
+6. Assigning VLANs dynamically through FreeRADIUS.
+7. Moving unknown devices into Quarantine VLAN.
+8. Managing Cisco Catalyst 2960X environments.
+9. Supporting future multi-site deployments.
+
+⸻
+
+TECHNOLOGY STACK
+
+Backend:
+
+* Laravel 12
+* PHP 8.4+
+* MariaDB 11+
+
+Frontend:
+
+* Blade
+* Bootstrap 5
+
+Queue:
+
+* Laravel Queue Database Driver
+
+Scheduler:
+
+* Laravel Scheduler
+
+Authentication:
+
+* Laravel Breeze
+
+API:
+
+* Laravel REST API
+
+Containerization:
+
+* Docker
+* Docker Compose
+
+Operating System:
+
+* Ubuntu 24.04 LTS
+
+Web Server:
+
+* Nginx
+
+Database:
+
+* MariaDB
+
+FreeRADIUS:
+
+* SQL Backend
+
+⸻
+
+CORE MODULES
+
+MODULE 1: DISCOVERY ENGINE
+
+Automatically discover devices from:
+
+Cisco Switches
+
+Collect:
+
+* MAC Address Table
+* Interface Table
+* Port Information
+* VLAN Information
+* Interface Description
+* Switch Name
+* Switch Model
+
+Protocol:
+
+* SNMP v2c
+* SNMP v3
+
+⸻
+
+DHCP Integration
+
+Collect:
+
+* MAC
+* IP
+* Lease Status
+* Lease Time
+
+Supported:
+
+* Windows DHCP
+* ISC DHCP
+
+⸻
+
+DNS Integration
+
+Collect:
+
+* Hostname
+* Forward Lookup
+* Reverse Lookup
+
+Supported:
+
+* Windows DNS
+* BIND DNS
+
+⸻
+
+Active Directory Integration
+
+Collect:
+
+* Computer Name
+* User Name
+* Last Logon
+* Department
+* OU
+* Operating System
+
+Protocol:
+
+* LDAP
+* LDAPS
+
+⸻
+
+MODULE 2: DEVICE CORRELATION ENGINE
+
+Merge all collected information into a single asset record.
+
+Example:
+
+MAC
+IP
+Hostname
+Username
+Switch
+Port
+VLAN
+Vendor
+Department
+
+Create a normalized inventory.
+
+⸻
+
+MODULE 3: INVENTORY MANAGEMENT
+
+Store:
+
+* Device History
+* First Seen
+* Last Seen
+* Current Status
+* Assigned VLAN
+* Approval Status
+
+Statuses:
+
+DISCOVERED
+PENDING
+APPROVED
+REJECTED
+QUARANTINED
+SYNCED
+
+⸻
+
+MODULE 4: DEVICE APPROVAL WORKFLOW
+
+Actions:
+
+Approve Device
+
+Reject Device
+
+Quarantine Device
+
+Assign VLAN
+
+Bulk Approve
+
+Bulk Reject
+
+Bulk VLAN Assignment
+
+⸻
+
+MODULE 5: FREE RADIUS INTEGRATION
+
+FreeRADIUS must use SQL backend.
+
+Create tables:
+
+devices
+
+vlans
+
+radius_clients
+
+radius_groups
+
+device_history
+
+No manual editing of:
+
+users
+
+clients.conf
+
+radcheck
+
+radreply
+
+All management must happen from GUI.
+
+⸻
+
+MODULE 6: NAC POLICY ENGINE
+
+Policy Examples:
+
+Known Device:
+Assign VLAN
+
+Unknown Device:
+Assign Quarantine VLAN
+
+Rejected Device:
+Deny Access
+
+Device Moved Port:
+Generate Alert
+
+Duplicate MAC:
+Generate Alert
+
+Duplicate IP:
+Generate Alert
+
+⸻
+
+MODULE 7: QUARANTINE MANAGEMENT
+
+Default Quarantine VLAN:
+
+999
+
+Features:
+
+View Quarantined Devices
+
+Approve From Quarantine
+
+Reject Permanently
+
+Move To Production VLAN
+
+⸻
+
+MODULE 8: CISCO 2960X SUPPORT
+
+Provide:
+
+Configuration Generator
+
+Generate:
+
+AAA
+
+RADIUS
+
+MAB
+
+DOT1X
+
+Guest VLAN
+
+Dynamic VLAN
+
+Reauthentication
+
+Generate ready-to-paste Cisco CLI configuration.
+
+⸻
+
+MODULE 9: DASHBOARD
+
+Show:
+
+Total Devices
+
+Approved Devices
+
+Pending Devices
+
+Rejected Devices
+
+Quarantined Devices
+
+New Devices Today
+
+Devices By VLAN
+
+Devices By Site
+
+Devices By Department
+
+⸻
+
+MODULE 10: REPORTING
+
+Reports:
+
+Inventory Report
+
+User Report
+
+Switch Report
+
+Port Report
+
+VLAN Report
+
+Compliance Report
+
+Export:
+
+PDF
+
+CSV
+
+Excel
+
+⸻
+
+MODULE 11: ALERTING
+
+Generate Alerts:
+
+New Device
+
+Device Offline
+
+Duplicate MAC
+
+Duplicate IP
+
+Port Change
+
+Unauthorized Device
+
+⸻
+
+MODULE 12: AUDIT LOGGING
+
+Track:
+
+User
+
+Action
+
+Old Value
+
+New Value
+
+Timestamp
+
+IP Address
+
+Every change must be auditable.
+
+⸻
+
+MULTI-SITE SUPPORT
+
+Create architecture supporting:
+
+Site
+
+Branch
+
+Location
+
+Building
+
+Floor
+
+Rack
+
+without code changes.
+
+⸻
+
+DATABASE REQUIREMENTS
+
+Generate:
+
+ER Diagram
+
+Schema Documentation
+
+Migration Files
+
+Seeders
+
+Factories
+
+Indexes
+
+Foreign Keys
+
+Constraints
+
+Rollback-safe migrations
+
+⸻
+
+API REQUIREMENTS
+
+Create REST APIs for every module.
+
+Generate:
+
+OpenAPI Specification
+
+Swagger Documentation
+
+API Examples
+
+Postman Collection
+
+⸻
+
+SECURITY REQUIREMENTS
+
+RBAC
+
+Roles:
+
+Super Admin
+
+Network Admin
+
+Helpdesk
+
+Auditor
+
+Read Only
+
+Use:
+
+CSRF
+
+Rate Limiting
+
+Encryption
+
+Password Policies
+
+Session Security
+
+Audit Trail
+
+⸻
+
+TESTING REQUIREMENTS
+
+Create:
+
+Unit Tests
+
+Feature Tests
+
+Integration Tests
+
+API Tests
+
+FreeRADIUS Sync Tests
+
+SNMP Discovery Tests
+
+LDAP Tests
+
+Coverage Target:
+
+80%+
+
+⸻
+
+DEVOPS REQUIREMENTS
+
+Provide:
+
+Dockerfile
+
+docker-compose.yml
+
+.env.example
+
+Nginx Configuration
+
+Supervisor Configuration
+
+Queue Configuration
+
+Backup Scripts
+
+Restore Scripts
+
+Health Checks
+
+Monitoring Endpoints
+
+⸻
+
+DOCUMENTATION REQUIREMENTS
+
+Generate:
+
+README.md
+
+INSTALLATION.md
+
+DEPLOYMENT.md
+
+ARCHITECTURE.md
+
+DATABASE.md
+
+API.md
+
+SECURITY.md
+
+BACKUP.md
+
+DISASTER_RECOVERY.md
+
+TESTING.md
+
+OPERATIONS_RUNBOOK.md
+
+CISCO_2960X_CONFIGURATION_GUIDE.md
+
+FREERADIUS_INTEGRATION_GUIDE.md
+
+TROUBLESHOOTING.md
+
+CHANGELOG.md
+
+⸻
+
+QUALITY REQUIREMENTS
+
+Do not generate:
+
+TODO
+
+FIXME
+
+Placeholder Code
+
+Mock Implementations
+
+Fake Data Logic
+
+Incomplete Screens
+
+Partially Implemented Features
+
+Hardcoded Credentials
+
+Hardcoded IPs
+
+Hardcoded VLAN IDs
+
+Every feature must be production-ready.
+
+⸻
+
+FINAL DELIVERY REQUIREMENTS
+
+Before completion:
+
+1. Run all migrations.
+2. Run all tests.
+3. Validate Docker deployment.
+4. Validate MariaDB deployment.
+5. Validate FreeRADIUS integration.
+6. Validate Cisco configuration generation.
+7. Validate API documentation.
+8. Validate role permissions.
+9. Generate complete documentation.
+10. Produce final deployment checklist.
+
+Return project only when all modules are complete, tested, documented and deployment-ready.
+Note:- Use a plugin/connector architecture. Discovery sources (SNMP, DHCP, DNS, AD, FreeRADIUS) must be independent services with their own interfaces, so future integrations can be added without modifying core code.

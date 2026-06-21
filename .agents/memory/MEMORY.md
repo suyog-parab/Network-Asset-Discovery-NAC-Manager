@@ -1,0 +1,1 @@
+- [NAC Manager project](nac-manager-project.md) — Full-stack NAC platform: schema, routes, seed, codegen all wired up and working.

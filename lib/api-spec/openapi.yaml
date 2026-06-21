@@ -3,20 +3,47 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Network Asset Discovery & NAC Manager API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Dashboard statistics
+  - name: devices
+    description: Device inventory management
+  - name: discovery
+    description: Discovery jobs
+  - name: vlans
+    description: VLAN management
+  - name: switches
+    description: Switch management
+  - name: sites
+    description: Site/location management
+  - name: radius
+    description: FreeRADIUS integration
+  - name: policies
+    description: NAC policy engine
+  - name: quarantine
+    description: Quarantine management
+  - name: alerts
+    description: Alert management
+  - name: audit
+    description: Audit log
+  - name: reports
+    description: Reports
+  - name: users
+    description: User management
+  - name: cisco
+    description: Cisco configuration generator
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +51,1263 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ───────────────────────────── DASHBOARD ─────────────────────────────
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get dashboard statistics
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /dashboard/devices-by-vlan:
+    get:
+      operationId: getDevicesByVlan
+      tags: [dashboard]
+      summary: Device count grouped by VLAN
+      responses:
+        "200":
+          description: Grouped counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GroupCount"
+
+  /dashboard/devices-by-site:
+    get:
+      operationId: getDevicesBySite
+      tags: [dashboard]
+      summary: Device count grouped by site
+      responses:
+        "200":
+          description: Grouped counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GroupCount"
+
+  /dashboard/devices-by-department:
+    get:
+      operationId: getDevicesByDepartment
+      tags: [dashboard]
+      summary: Device count grouped by department
+      responses:
+        "200":
+          description: Grouped counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GroupCount"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Recent audit log entries for activity feed
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLog"
+
+  # ───────────────────────────── DEVICES ─────────────────────────────
+  /devices:
+    get:
+      operationId: listDevices
+      tags: [devices]
+      summary: List all devices
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/DeviceStatus"
+        - in: query
+          name: vlanId
+          schema:
+            type: integer
+        - in: query
+          name: siteId
+          schema:
+            type: integer
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Paginated device list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedDevices"
+    post:
+      operationId: createDevice
+      tags: [devices]
+      summary: Manually register a device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDeviceRequest"
+      responses:
+        "201":
+          description: Device created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+
+  /devices/{id}:
+    get:
+      operationId: getDevice
+      tags: [devices]
+      summary: Get device by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Device detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+    put:
+      operationId: updateDevice
+      tags: [devices]
+      summary: Update device
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDeviceRequest"
+      responses:
+        "200":
+          description: Updated device
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+    delete:
+      operationId: deleteDevice
+      tags: [devices]
+      summary: Delete device
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /devices/{id}/approve:
+    post:
+      operationId: approveDevice
+      tags: [devices]
+      summary: Approve a device
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceApproval"
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+
+  /devices/{id}/reject:
+    post:
+      operationId: rejectDevice
+      tags: [devices]
+      summary: Reject a device
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceRejection"
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+
+  /devices/{id}/quarantine:
+    post:
+      operationId: quarantineDevice
+      tags: [devices]
+      summary: Move device to quarantine
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Quarantined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+
+  /devices/{id}/history:
+    get:
+      operationId: getDeviceHistory
+      tags: [devices]
+      summary: Get device audit history
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Device history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeviceHistory"
+
+  /devices/bulk-approve:
+    post:
+      operationId: bulkApproveDevices
+      tags: [devices]
+      summary: Bulk approve devices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkActionRequest"
+      responses:
+        "200":
+          description: Bulk result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkActionResult"
+
+  /devices/bulk-reject:
+    post:
+      operationId: bulkRejectDevices
+      tags: [devices]
+      summary: Bulk reject devices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkActionRequest"
+      responses:
+        "200":
+          description: Bulk result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkActionResult"
+
+  /devices/bulk-vlan:
+    post:
+      operationId: bulkAssignVlan
+      tags: [devices]
+      summary: Bulk assign VLAN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkVlanAssignment"
+      responses:
+        "200":
+          description: Bulk result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkActionResult"
+
+  # ───────────────────────────── DISCOVERY ─────────────────────────────
+  /discovery/jobs:
+    get:
+      operationId: listDiscoveryJobs
+      tags: [discovery]
+      summary: List discovery jobs
+      responses:
+        "200":
+          description: Discovery jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DiscoveryJob"
+    post:
+      operationId: createDiscoveryJob
+      tags: [discovery]
+      summary: Create and trigger a discovery job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDiscoveryJobRequest"
+      responses:
+        "201":
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoveryJob"
+
+  /discovery/jobs/{id}:
+    get:
+      operationId: getDiscoveryJob
+      tags: [discovery]
+      summary: Get discovery job status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Job detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoveryJob"
+
+  /discovery/sources:
+    get:
+      operationId: listDiscoverySources
+      tags: [discovery]
+      summary: List configured discovery sources
+      responses:
+        "200":
+          description: Sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DiscoverySource"
+    post:
+      operationId: createDiscoverySource
+      tags: [discovery]
+      summary: Add a discovery source
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDiscoverySourceRequest"
+      responses:
+        "201":
+          description: Source created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoverySource"
+
+  /discovery/sources/{id}:
+    put:
+      operationId: updateDiscoverySource
+      tags: [discovery]
+      summary: Update a discovery source
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDiscoverySourceRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoverySource"
+    delete:
+      operationId: deleteDiscoverySource
+      tags: [discovery]
+      summary: Delete discovery source
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ───────────────────────────── VLANs ─────────────────────────────
+  /vlans:
+    get:
+      operationId: listVlans
+      tags: [vlans]
+      summary: List all VLANs
+      responses:
+        "200":
+          description: VLAN list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vlan"
+    post:
+      operationId: createVlan
+      tags: [vlans]
+      summary: Create a VLAN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVlanRequest"
+      responses:
+        "201":
+          description: VLAN created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vlan"
+
+  /vlans/{id}:
+    get:
+      operationId: getVlan
+      tags: [vlans]
+      summary: Get VLAN by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: VLAN
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vlan"
+    put:
+      operationId: updateVlan
+      tags: [vlans]
+      summary: Update VLAN
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVlanRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vlan"
+    delete:
+      operationId: deleteVlan
+      tags: [vlans]
+      summary: Delete VLAN
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ───────────────────────────── SWITCHES ─────────────────────────────
+  /switches:
+    get:
+      operationId: listSwitches
+      tags: [switches]
+      summary: List all switches
+      responses:
+        "200":
+          description: Switch list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Switch"
+    post:
+      operationId: createSwitch
+      tags: [switches]
+      summary: Add a switch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSwitchRequest"
+      responses:
+        "201":
+          description: Switch created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Switch"
+
+  /switches/{id}:
+    get:
+      operationId: getSwitch
+      tags: [switches]
+      summary: Get switch
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Switch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Switch"
+    put:
+      operationId: updateSwitch
+      tags: [switches]
+      summary: Update switch
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSwitchRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Switch"
+    delete:
+      operationId: deleteSwitch
+      tags: [switches]
+      summary: Delete switch
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ───────────────────────────── SITES ─────────────────────────────
+  /sites:
+    get:
+      operationId: listSites
+      tags: [sites]
+      summary: List all sites
+      responses:
+        "200":
+          description: Site list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Site"
+    post:
+      operationId: createSite
+      tags: [sites]
+      summary: Create site
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSiteRequest"
+      responses:
+        "201":
+          description: Site created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Site"
+
+  /sites/{id}:
+    get:
+      operationId: getSite
+      tags: [sites]
+      summary: Get site
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Site
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Site"
+    put:
+      operationId: updateSite
+      tags: [sites]
+      summary: Update site
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSiteRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Site"
+    delete:
+      operationId: deleteSite
+      tags: [sites]
+      summary: Delete site
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ───────────────────────────── RADIUS ─────────────────────────────
+  /radius/clients:
+    get:
+      operationId: listRadiusClients
+      tags: [radius]
+      summary: List RADIUS clients
+      responses:
+        "200":
+          description: Clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RadiusClient"
+    post:
+      operationId: createRadiusClient
+      tags: [radius]
+      summary: Add RADIUS client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRadiusClientRequest"
+      responses:
+        "201":
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RadiusClient"
+
+  /radius/clients/{id}:
+    put:
+      operationId: updateRadiusClient
+      tags: [radius]
+      summary: Update RADIUS client
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRadiusClientRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RadiusClient"
+    delete:
+      operationId: deleteRadiusClient
+      tags: [radius]
+      summary: Delete RADIUS client
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /radius/groups:
+    get:
+      operationId: listRadiusGroups
+      tags: [radius]
+      summary: List RADIUS groups
+      responses:
+        "200":
+          description: Groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RadiusGroup"
+    post:
+      operationId: createRadiusGroup
+      tags: [radius]
+      summary: Create RADIUS group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRadiusGroupRequest"
+      responses:
+        "201":
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RadiusGroup"
+
+  /radius/groups/{id}:
+    put:
+      operationId: updateRadiusGroup
+      tags: [radius]
+      summary: Update RADIUS group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRadiusGroupRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RadiusGroup"
+    delete:
+      operationId: deleteRadiusGroup
+      tags: [radius]
+      summary: Delete RADIUS group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /radius/sync:
+    post:
+      operationId: syncToRadius
+      tags: [radius]
+      summary: Sync approved devices to FreeRADIUS
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RadiusSyncInput"
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResult"
+
+  /radius/sync-status:
+    get:
+      operationId: getRadiusSyncStatus
+      tags: [radius]
+      summary: Get last sync status
+      responses:
+        "200":
+          description: Sync status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncStatus"
+
+  # ───────────────────────────── POLICIES ─────────────────────────────
+  /policies:
+    get:
+      operationId: listPolicies
+      tags: [policies]
+      summary: List NAC policies
+      responses:
+        "200":
+          description: Policies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NacPolicy"
+    post:
+      operationId: createPolicy
+      tags: [policies]
+      summary: Create NAC policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNacPolicyRequest"
+      responses:
+        "201":
+          description: Policy created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NacPolicy"
+
+  /policies/{id}:
+    put:
+      operationId: updatePolicy
+      tags: [policies]
+      summary: Update NAC policy
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNacPolicyRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NacPolicy"
+    delete:
+      operationId: deletePolicy
+      tags: [policies]
+      summary: Delete NAC policy
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ───────────────────────────── ALERTS ─────────────────────────────
+  /alerts:
+    get:
+      operationId: listAlerts
+      tags: [alerts]
+      summary: List alerts
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, acknowledged, resolved]
+        - in: query
+          name: severity
+          schema:
+            type: string
+            enum: [critical, warning, info]
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Alert list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedAlerts"
+
+  /alerts/{id}/acknowledge:
+    post:
+      operationId: acknowledgeAlert
+      tags: [alerts]
+      summary: Acknowledge an alert
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+
+  /alerts/{id}/resolve:
+    post:
+      operationId: resolveAlert
+      tags: [alerts]
+      summary: Resolve an alert
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+
+  /alerts/counts:
+    get:
+      operationId: getAlertCounts
+      tags: [alerts]
+      summary: Get alert counts by severity and status
+      responses:
+        "200":
+          description: Alert counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertCounts"
+
+  # ───────────────────────────── AUDIT ─────────────────────────────
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [audit]
+      summary: List audit log entries
+      parameters:
+        - in: query
+          name: userId
+          schema:
+            type: integer
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedAuditLogs"
+
+  # ───────────────────────────── REPORTS ─────────────────────────────
+  /reports/inventory:
+    get:
+      operationId: getInventoryReport
+      tags: [reports]
+      summary: Get inventory report data
+      responses:
+        "200":
+          description: Inventory report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryReport"
+
+  /reports/compliance:
+    get:
+      operationId: getComplianceReport
+      tags: [reports]
+      summary: Get compliance report data
+      responses:
+        "200":
+          description: Compliance report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceReport"
+
+  # ───────────────────────────── USERS ─────────────────────────────
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [users]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [users]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ───────────────────────────── CISCO ─────────────────────────────
+  /cisco/generate-config:
+    post:
+      operationId: generateCiscoConfig
+      tags: [cisco]
+      summary: Generate Cisco 2960X NAC configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CiscoConfigRequest"
+      responses:
+        "200":
+          description: Generated config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CiscoConfigResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +1315,982 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    DeviceApproval:
+      type: object
+      properties:
+        vlanId:
+          type: integer
+
+    DeviceRejection:
+      type: object
+      properties:
+        reason:
+          type: string
+
+    BulkVlanAssignment:
+      type: object
+      required: [ids, vlanId]
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+        vlanId:
+          type: integer
+
+    RadiusSyncInput:
+      type: object
+      properties:
+        deviceIds:
+          type: array
+          items:
+            type: integer
+
+    DeviceStatus:
+      type: string
+      enum: [DISCOVERED, PENDING, APPROVED, REJECTED, QUARANTINED, SYNCED]
+
+    Device:
+      type: object
+      properties:
+        id:
+          type: integer
+        macAddress:
+          type: string
+        ipAddress:
+          type: string
+          nullable: true
+        hostname:
+          type: string
+          nullable: true
+        username:
+          type: string
+          nullable: true
+        vendor:
+          type: string
+          nullable: true
+        operatingSystem:
+          type: string
+          nullable: true
+        department:
+          type: string
+          nullable: true
+        switchName:
+          type: string
+          nullable: true
+        switchPort:
+          type: string
+          nullable: true
+        vlanId:
+          type: integer
+          nullable: true
+        vlan:
+          $ref: "#/components/schemas/Vlan"
+          nullable: true
+        siteId:
+          type: integer
+          nullable: true
+        site:
+          $ref: "#/components/schemas/Site"
+          nullable: true
+        status:
+          $ref: "#/components/schemas/DeviceStatus"
+        firstSeen:
+          type: string
+          format: date-time
+        lastSeen:
+          type: string
+          format: date-time
+        approvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        approvedBy:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        radiusSynced:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - macAddress
+        - status
+        - firstSeen
+        - lastSeen
+        - radiusSynced
+        - createdAt
+        - updatedAt
+
+    CreateDeviceRequest:
+      type: object
+      required: [macAddress]
+      properties:
+        macAddress:
+          type: string
+        ipAddress:
+          type: string
+        hostname:
+          type: string
+        username:
+          type: string
+        vendor:
+          type: string
+        operatingSystem:
+          type: string
+        department:
+          type: string
+        switchName:
+          type: string
+        switchPort:
+          type: string
+        vlanId:
+          type: integer
+        siteId:
+          type: integer
+        notes:
+          type: string
+
+    UpdateDeviceRequest:
+      type: object
+      properties:
+        hostname:
+          type: string
+        username:
+          type: string
+        vendor:
+          type: string
+        operatingSystem:
+          type: string
+        department:
+          type: string
+        vlanId:
+          type: integer
+        siteId:
+          type: integer
+        notes:
+          type: string
+
+    PaginatedDevices:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Device"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    DeviceHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+        deviceId:
+          type: integer
+        action:
+          type: string
+        oldStatus:
+          type: string
+          nullable: true
+        newStatus:
+          type: string
+          nullable: true
+        oldVlan:
+          type: string
+          nullable: true
+        newVlan:
+          type: string
+          nullable: true
+        performedBy:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, deviceId, action, createdAt]
+
+    BulkActionRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+        vlanId:
+          type: integer
+        reason:
+          type: string
+
+    BulkActionResult:
+      type: object
+      required: [succeeded, failed]
+      properties:
+        succeeded:
+          type: integer
+        failed:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    DashboardStats:
+      type: object
+      required:
+        - totalDevices
+        - approvedDevices
+        - pendingDevices
+        - rejectedDevices
+        - quarantinedDevices
+        - newDevicesToday
+        - syncedDevices
+        - openAlerts
+      properties:
+        totalDevices:
+          type: integer
+        approvedDevices:
+          type: integer
+        pendingDevices:
+          type: integer
+        rejectedDevices:
+          type: integer
+        quarantinedDevices:
+          type: integer
+        newDevicesToday:
+          type: integer
+        syncedDevices:
+          type: integer
+        openAlerts:
+          type: integer
+
+    GroupCount:
+      type: object
+      required: [name, count]
+      properties:
+        name:
+          type: string
+        count:
+          type: integer
+        id:
+          type: integer
+
+    Vlan:
+      type: object
+      required: [id, vlanId, name]
+      properties:
+        id:
+          type: integer
+        vlanId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [production, quarantine, guest, management]
+          nullable: true
+        isQuarantine:
+          type: boolean
+        deviceCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateVlanRequest:
+      type: object
+      required: [vlanId, name]
+      properties:
+        vlanId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [production, quarantine, guest, management]
+        isQuarantine:
+          type: boolean
+
+    Switch:
+      type: object
+      required: [id, name, ipAddress]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        ipAddress:
+          type: string
+        model:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        siteId:
+          type: integer
+          nullable: true
+        site:
+          $ref: "#/components/schemas/Site"
+          nullable: true
+        snmpVersion:
+          type: string
+          enum: [v2c, v3]
+        snmpCommunity:
+          type: string
+          nullable: true
+        snmpUsername:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [online, offline, unknown]
+        lastPolled:
+          type: string
+          format: date-time
+          nullable: true
+        deviceCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateSwitchRequest:
+      type: object
+      required: [name, ipAddress, snmpVersion]
+      properties:
+        name:
+          type: string
+        ipAddress:
+          type: string
+        model:
+          type: string
+        location:
+          type: string
+        siteId:
+          type: integer
+        snmpVersion:
+          type: string
+          enum: [v2c, v3]
+        snmpCommunity:
+          type: string
+        snmpUsername:
+          type: string
+        snmpAuthPassword:
+          type: string
+        snmpPrivPassword:
+          type: string
+
+    Site:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        parentId:
+          type: integer
+          nullable: true
+        type:
+          type: string
+          enum: [site, branch, building, floor, rack]
+        deviceCount:
+          type: integer
+        switchCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateSiteRequest:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        country:
+          type: string
+        parentId:
+          type: integer
+        type:
+          type: string
+          enum: [site, branch, building, floor, rack]
+
+    DiscoveryJob:
+      type: object
+      required: [id, type, status, createdAt]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [snmp, dhcp, dns, ad, manual]
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        sourceId:
+          type: integer
+          nullable: true
+        sourceName:
+          type: string
+          nullable: true
+        devicesFound:
+          type: integer
+        devicesNew:
+          type: integer
+        devicesUpdated:
+          type: integer
+        errorMessage:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateDiscoveryJobRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [snmp, dhcp, dns, ad, manual]
+        sourceId:
+          type: integer
+
+    DiscoverySource:
+      type: object
+      required: [id, name, type]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [snmp, dhcp_windows, dhcp_isc, dns_windows, dns_bind, active_directory]
+        host:
+          type: string
+        port:
+          type: integer
+          nullable: true
+        enabled:
+          type: boolean
+        lastRunAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastRunStatus:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateDiscoverySourceRequest:
+      type: object
+      required: [name, type, host]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [snmp, dhcp_windows, dhcp_isc, dns_windows, dns_bind, active_directory]
+        host:
+          type: string
+        port:
+          type: integer
+        username:
+          type: string
+        password:
+          type: string
+        community:
+          type: string
+        enabled:
+          type: boolean
+
+    RadiusClient:
+      type: object
+      required: [id, name, ipAddress]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        ipAddress:
+          type: string
+        secret:
+          type: string
+        nasType:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateRadiusClientRequest:
+      type: object
+      required: [name, ipAddress, secret]
+      properties:
+        name:
+          type: string
+        ipAddress:
+          type: string
+        secret:
+          type: string
+        nasType:
+          type: string
+        description:
+          type: string
+
+    RadiusGroup:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        vlanId:
+          type: integer
+          nullable: true
+        vlan:
+          $ref: "#/components/schemas/Vlan"
+          nullable: true
+        attribute:
+          type: string
+          nullable: true
+        value:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        deviceCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateRadiusGroupRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        vlanId:
+          type: integer
+        attribute:
+          type: string
+        value:
+          type: string
+        description:
+          type: string
+
+    SyncResult:
+      type: object
+      required: [synced, failed]
+      properties:
+        synced:
+          type: integer
+        failed:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    SyncStatus:
+      type: object
+      required: [lastSyncAt, syncedCount]
+      properties:
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+        syncedCount:
+          type: integer
+        pendingSyncCount:
+          type: integer
+
+    NacPolicy:
+      type: object
+      required: [id, name, condition, action, priority]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        condition:
+          type: string
+          enum: [known_device, unknown_device, rejected_device, port_change, duplicate_mac, duplicate_ip]
+        action:
+          type: string
+          enum: [assign_vlan, deny_access, quarantine, alert, approve]
+        priority:
+          type: integer
+        vlanId:
+          type: integer
+          nullable: true
+        vlan:
+          $ref: "#/components/schemas/Vlan"
+          nullable: true
+        enabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateNacPolicyRequest:
+      type: object
+      required: [name, condition, action, priority]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        condition:
+          type: string
+          enum: [known_device, unknown_device, rejected_device, port_change, duplicate_mac, duplicate_ip]
+        action:
+          type: string
+          enum: [assign_vlan, deny_access, quarantine, alert, approve]
+        priority:
+          type: integer
+        vlanId:
+          type: integer
+        enabled:
+          type: boolean
+
+    Alert:
+      type: object
+      required: [id, type, severity, status, message, createdAt]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [new_device, device_offline, duplicate_mac, duplicate_ip, port_change, unauthorized_device, policy_violation]
+        severity:
+          type: string
+          enum: [critical, warning, info]
+        status:
+          type: string
+          enum: [open, acknowledged, resolved]
+        message:
+          type: string
+        deviceId:
+          type: integer
+          nullable: true
+        device:
+          $ref: "#/components/schemas/Device"
+          nullable: true
+        acknowledgedBy:
+          type: string
+          nullable: true
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AlertCounts:
+      type: object
+      required: [total, open, critical, warning, info]
+      properties:
+        total:
+          type: integer
+        open:
+          type: integer
+        critical:
+          type: integer
+        warning:
+          type: integer
+        info:
+          type: integer
+
+    PaginatedAlerts:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Alert"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    AuditLog:
+      type: object
+      required: [id, action, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+          nullable: true
+        username:
+          type: string
+          nullable: true
+        action:
+          type: string
+        entityType:
+          type: string
+          nullable: true
+        entityId:
+          type: integer
+          nullable: true
+        oldValue:
+          type: string
+          nullable: true
+        newValue:
+          type: string
+          nullable: true
+        ipAddress:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    PaginatedAuditLogs:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    InventoryReport:
+      type: object
+      required: [generatedAt, totalDevices, byStatus, byVlan, bySite]
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        totalDevices:
+          type: integer
+        byStatus:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupCount"
+        byVlan:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupCount"
+        bySite:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupCount"
+        byVendor:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupCount"
+
+    ComplianceReport:
+      type: object
+      required: [generatedAt, complianceRate, totalDevices, approvedDevices, pendingDevices, quarantinedDevices, rejectedDevices]
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        complianceRate:
+          type: number
+          format: float
+        totalDevices:
+          type: integer
+        approvedDevices:
+          type: integer
+        pendingDevices:
+          type: integer
+        quarantinedDevices:
+          type: integer
+        rejectedDevices:
+          type: integer
+        unsyncedApproved:
+          type: integer
+
+    User:
+      type: object
+      required: [id, username, email, role]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, network_admin, helpdesk, auditor, read_only]
+        fullName:
+          type: string
+          nullable: true
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateUserRequest:
+      type: object
+      required: [username, email, password, role]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, network_admin, helpdesk, auditor, read_only]
+        fullName:
+          type: string
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, network_admin, helpdesk, auditor, read_only]
+        fullName:
+          type: string
+        active:
+          type: boolean
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [user, token]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+
+    CiscoConfigRequest:
+      type: object
+      required: [radiusServerIp, radiusSecret]
+      properties:
+        radiusServerIp:
+          type: string
+        radiusSecret:
+          type: string
+        radiusAuthPort:
+          type: integer
+        radiusAcctPort:
+          type: integer
+        guestVlanId:
+          type: integer
+        quarantineVlanId:
+          type: integer
+        reauthTimer:
+          type: integer
+        enableDot1x:
+          type: boolean
+        enableMab:
+          type: boolean
+        interfaces:
+          type: array
+          items:
+            type: string
+
+    CiscoConfigResponse:
+      type: object
+      required: [config]
+      properties:
+        config:
+          type: string
+        warnings:
+          type: array
+          items:
+            type: string

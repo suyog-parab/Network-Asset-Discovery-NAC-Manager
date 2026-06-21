@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "NAC Manager"
+version = "1.0.0"
+id = "artifacts/nac-manager"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19518
+
+[services.development]
+run = "pnpm --filter @workspace/nac-manager run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/nac-manager", "run", "build" ]
+publicDir = "artifacts/nac-manager/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19518"
+BASE_PATH = "/"

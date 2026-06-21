@@ -1,0 +1,106 @@
+server default {
+	listen {
+		type = auth
+		ipaddr = *
+		port = 1812
+		limit {
+			max_connections = 16
+			lifetime = 0
+			idle_timeout = 30
+		}
+	}
+
+	listen {
+		type = acct
+		ipaddr = *
+		port = 1813
+		limit {
+			max_connections = 16
+			lifetime = 0
+			idle_timeout = 30
+		}
+	}
+
+	listen {
+		type = auth+acct
+		ipaddr = *
+		port = 1812
+		proto = udp
+	}
+
+	authorize {
+		filter_username
+		preprocess
+
+		if ("%{request:User-Name}" =~ /^([0-9a-f]{2}[:-]?){5}[0-9a-f]{2}$/i) {
+			update request {
+				&User-Name := "%{tolower:%{request:User-Name}}"
+				&User-Name := "%{User-Name}"
+			}
+			mac_auth_policy
+		}
+
+		sql
+
+		if (notfound) {
+			reject
+		}
+
+		pap
+	}
+
+	authenticate {
+		Auth-Type PAP {
+			pap
+		}
+
+		Auth-Type MAC-Auth {
+			ok
+		}
+	}
+
+	preacct {
+		preprocess
+		acct_unique
+		suffix
+		files
+	}
+
+	accounting {
+		detail
+		unix
+		sql
+		exec
+		attr_filter.accounting_response
+	}
+
+	session {
+		sql
+	}
+
+	post-auth {
+		if (session-state:User-Name) {
+			-sql
+		}
+
+		exec
+		remove_reply_message_if_eap
+
+		Post-Auth-Type REJECT {
+			sql
+			attr_filter.access_reject
+			eap
+			remove_reply_message_if_eap
+		}
+
+		Post-Auth-Type Challenge {
+		}
+	}
+
+	pre-proxy {
+	}
+
+	post-proxy {
+		eap
+	}
+}

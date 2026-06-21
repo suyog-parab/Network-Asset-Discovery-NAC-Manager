@@ -1,0 +1,468 @@
+IMPORTANT: THIS IS NOT A NEW PROJECT.
+
+CONTINUE THE EXISTING NAC MANAGER PROJECT.
+
+DO NOT REBUILD.
+DO NOT RESTART.
+DO NOT REGENERATE.
+DO NOT REPLACE THE EXISTING ARCHITECTURE.
+
+Treat the current codebase as Production Candidate v0.1.
+
+The current UI, routes, database schema and workflows already exist.
+
+Your task is to transform the existing prototype into a real production-ready Network Discovery + NAC Platform.
+
+====================================================================
+CRITICAL PRESERVATION RULES
+
+DO NOT:
+
+* Delete existing code.
+* Delete existing pages.
+* Delete existing APIs.
+* Rename routes.
+* Rename database tables.
+* Break frontend functionality.
+* Replace PostgreSQL.
+* Rebuild the project from scratch.
+* Create a second architecture beside the existing one.
+
+USE EXTEND-ONLY APPROACH.
+
+Every modification must be backward compatible.
+
+If a schema change is required:
+
+1. Generate migration.
+2. Generate rollback migration.
+3. Generate impact analysis.
+4. Preserve existing data.
+
+====================================================================
+PHASE 0 - CODEBASE AUDIT
+
+Before coding:
+
+Generate:
+
+1. Existing architecture diagram
+2. Existing API inventory
+3. Existing database inventory
+4. Existing pages inventory
+5. Existing integrations inventory
+6. Technical debt report
+7. Dependency report
+
+Save all reports under:
+
+/docs/audit/
+
+Do not modify production code during audit.
+
+====================================================================
+PHASE 1 - INFRASTRUCTURE FOUNDATION
+
+Implement:
+
+1. Dockerfile (API)
+2. Dockerfile (Frontend)
+3. docker-compose.yml
+4. PostgreSQL persistent storage
+5. FreeRADIUS container
+6. FreeRADIUS SQL schema
+7. Nginx reverse proxy
+8. .env.example
+9. Health checks
+10. Startup validation scripts
+
+Requirements:
+
+Ubuntu 24.04 deployable.
+
+Generate:
+
+/docs/deployment/
+
+Validate:
+
+docker compose up -d
+
+All services healthy.
+
+====================================================================
+PHASE 2 - SNMP POLLER SERVICE
+
+Implement real SNMP polling.
+
+Support:
+
+Cisco Catalyst 2960X
+
+SNMPv2c
+SNMPv3
+
+Collect:
+
+MAC Table
+ARP Table
+Interface Table
+VLAN Table
+Port Status
+CDP Neighbors
+
+Requirements:
+
+Connection test
+Health check
+Retry logic
+Job logs
+Scheduling
+
+No mock data.
+
+====================================================================
+PHASE 3 - DHCP COLLECTOR
+
+Implement:
+
+Windows DHCP
+
+ISC DHCP
+
+Collect:
+
+IP
+MAC
+Lease
+Hostname
+
+Requirements:
+
+Connection test
+Health check
+Retry logic
+Audit logs
+
+====================================================================
+PHASE 4 - DNS RESOLVER
+
+Implement:
+
+Reverse DNS
+
+Forward DNS
+
+Windows DNS
+
+BIND DNS
+
+Collect:
+
+Hostname
+PTR Records
+A Records
+
+Requirements:
+
+Bulk resolution
+Connection test
+Health check
+Retry logic
+
+====================================================================
+PHASE 5 - ACTIVE DIRECTORY / LDAP
+
+Implement:
+
+LDAP
+LDAPS
+
+Collect:
+
+User
+Department
+Computer Name
+Operating System
+Last Logon
+OU
+
+Requirements:
+
+Encrypted credentials
+Incremental sync
+Health checks
+Retry logic
+
+====================================================================
+PHASE 6 - DEVICE CORRELATION ENGINE
+
+Create authoritative inventory.
+
+Merge:
+
+SNMP
+DHCP
+DNS
+LDAP
+
+Primary key:
+
+MAC Address
+
+Implement:
+
+Duplicate MAC Detection
+Duplicate IP Detection
+Port Move Detection
+Device History
+
+Generate alerts.
+
+====================================================================
+PHASE 7 - FREERADIUS SQL INTEGRATION
+
+Deploy real FreeRADIUS.
+
+Configure:
+
+radcheck
+radreply
+radusergroup
+radgroupcheck
+radgroupreply
+
+Approved devices must automatically sync.
+
+Rejected devices must be removed.
+
+No manual edits.
+
+GUI controls everything.
+
+====================================================================
+PHASE 8 - MAB POLICY ENGINE
+
+Implement:
+
+Known Device
+Unknown Device
+Rejected Device
+Duplicate MAC
+Duplicate IP
+Port Change
+
+Actions:
+
+Assign VLAN
+Reject Access
+Quarantine
+Generate Alert
+
+Policy execution must be real.
+
+No simulated evaluation.
+
+====================================================================
+PHASE 9 - QUARANTINE VLAN WORKFLOW
+
+Implement:
+
+Quarantine VLAN 999
+
+Support:
+
+RADIUS CoA
+
+and
+
+SNMP VLAN reassignment fallback.
+
+Workflow:
+
+Quarantine
+→ CoA
+→ Verify VLAN
+→ Audit Log
+
+Approve
+→ Production VLAN
+→ CoA
+→ Verification
+
+====================================================================
+PHASE 10 - DISCOVERY WORKFLOW
+
+Workflow:
+
+Device discovered
+→ Pending
+→ Approved
+→ Synced to RADIUS
+→ Active
+
+Unknown device:
+
+→ Quarantine VLAN
+
+Bulk approval supported.
+
+====================================================================
+PHASE 11 - CONNECTION TEST FRAMEWORK
+
+Every integration must expose:
+
+Test Connection
+Last Success
+Last Failure
+Error Message
+Latency
+Health Status
+
+Supported for:
+
+SNMP
+DHCP
+DNS
+LDAP
+FreeRADIUS
+
+====================================================================
+PHASE 12 - LOGGING & AUDIT
+
+Implement:
+
+Structured logs
+Audit logs
+Job logs
+Integration logs
+
+Store in database.
+
+Exportable.
+
+====================================================================
+PHASE 13 - SECURITY
+
+Replace SHA256 authentication.
+
+Implement:
+
+bcrypt
+
+Sessions
+
+CSRF
+
+RBAC
+
+Rate Limiting
+
+Security headers
+
+====================================================================
+PHASE 14 - TESTING
+
+Create:
+
+Unit Tests
+Integration Tests
+API Tests
+SNMP Tests
+LDAP Tests
+FreeRADIUS Tests
+
+Generate test reports.
+
+====================================================================
+PHASE 15 - DOCUMENTATION
+
+Generate:
+
+README.md
+
+INSTALLATION.md
+
+DEPLOYMENT.md
+
+ARCHITECTURE.md
+
+DATABASE.md
+
+API.md
+
+SECURITY.md
+
+BACKUP.md
+
+DISASTER_RECOVERY.md
+
+OPERATIONS_RUNBOOK.md
+
+FREERADIUS_GUIDE.md
+
+CISCO_2960X_GUIDE.md
+
+TROUBLESHOOTING.md
+
+CHANGELOG.md
+
+====================================================================
+CRITICAL RULES
+
+NO MOCK DATA
+
+NO RANDOM DEVICE GENERATION
+
+NO FAKE ALERTS
+
+NO PLACEHOLDER IMPLEMENTATIONS
+
+NO TODO COMMENTS
+
+NO PARTIAL FEATURES
+
+NO SIMULATED DISCOVERY
+
+NO SIMULATED FREERADIUS
+
+NO SIMULATED LDAP
+
+NO SIMULATED SNMP
+
+NO SIMULATED DHCP
+
+NO SIMULATED DNS
+
+Every feature must be production-grade.
+
+====================================================================
+COMPLETION CRITERIA
+
+Do not declare any module complete until:
+
+1. Code implemented.
+2. Tests written.
+3. Health checks written.
+4. Documentation written.
+5. Migration scripts written.
+6. Rollback scripts written.
+7. Docker deployment validated.
+8. No mock implementation remains.
+
+At the end provide:
+
+* Gap Closure Report
+* Architecture Diagram
+* Deployment Checklist
+* Migration Guide
+* Rollback Guide
+* Production Readiness Report
+
+Work incrementally.
+
+Preserve existing functionality.
+
+Extend the existing system only.
+
+Do not restart the project.

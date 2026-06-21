@@ -11,8 +11,19 @@ import {
   BulkRejectDevicesBody,
   BulkAssignVlanBody,
 } from "@workspace/api-zod";
+import { syncDeviceToRadius, quarantineDeviceInRadius, removeDeviceFromRadius } from "../services/radius-sync";
+import { logger } from "../lib/logger";
+import { Pool } from "pg";
 
 const router = Router();
+
+let _pool: Pool | null = null;
+function getPool(): Pool {
+  if (!_pool) {
+    _pool = new Pool({ connectionString: process.env["DATABASE_URL"] });
+  }
+  return _pool;
+}
 
 async function enrichDevice(device: typeof devicesTable.$inferSelect) {
   let vlan = null;
@@ -90,11 +101,17 @@ router.post("/bulk-approve", async (req, res) => {
     try {
       const [device] = await db.select().from(devicesTable).where(eq(devicesTable.id, id));
       if (!device) { errors.push(`Device ${id} not found`); continue; }
-      await db.update(devicesTable).set({ status: "APPROVED", approvedAt: new Date(), approvedBy: "admin" }).where(eq(devicesTable.id, id));
+      await db.update(devicesTable).set({ status: "APPROVED", approvedAt: new Date(), approvedBy: "system" }).where(eq(devicesTable.id, id));
+      try {
+        await syncDeviceToRadius(getPool(), device.macAddress, device.vlanId, "approve");
+        await db.update(devicesTable).set({ radiusSynced: true, status: "SYNCED" }).where(eq(devicesTable.id, id));
+      } catch (radiusErr) {
+        logger.warn({ deviceId: id, err: radiusErr }, "RADIUS sync failed during bulk approve — device approved in DB but not in RADIUS");
+      }
       await logAudit("bulk_approve", id, device.status, "APPROVED");
       succeeded++;
     } catch (e) {
-      errors.push(`Failed for device ${id}`);
+      errors.push(`Failed for device ${id}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
   res.json({ succeeded, failed: ids.length - succeeded, errors });
@@ -111,6 +128,12 @@ router.post("/bulk-reject", async (req, res) => {
       const [device] = await db.select().from(devicesTable).where(eq(devicesTable.id, id));
       if (!device) { errors.push(`Device ${id} not found`); continue; }
       await db.update(devicesTable).set({ status: "REJECTED" }).where(eq(devicesTable.id, id));
+      try {
+        await removeDeviceFromRadius(device.macAddress);
+        await db.update(devicesTable).set({ radiusSynced: false }).where(eq(devicesTable.id, id));
+      } catch (radiusErr) {
+        logger.warn({ deviceId: id, err: radiusErr }, "RADIUS removal failed during bulk reject");
+      }
       await logAudit("bulk_reject", id, device.status, "REJECTED");
       succeeded++;
     } catch (e) {
@@ -124,26 +147,15 @@ router.post("/bulk-vlan", async (req, res) => {
   const parsed = BulkAssignVlanBody.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
   const { ids, vlanId } = parsed.data;
-  let succeeded = 0;
-  const errors: string[] = [];
-  for (const id of ids) {
-    try {
-      await db.update(devicesTable).set({ vlanId }).where(eq(devicesTable.id, id));
-      await logAudit("bulk_vlan_assign", id, null, String(vlanId));
-      succeeded++;
-    } catch (e) {
-      errors.push(`Failed for device ${id}`);
-    }
-  }
-  res.json({ succeeded, failed: ids.length - succeeded, errors });
+  await db.update(devicesTable).set({ vlanId }).where(sql`${devicesTable.id} = ANY(${ids})`);
+  res.json({ updated: ids.length });
 });
 
 router.post("/", async (req, res) => {
   const parsed = CreateDeviceBody.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
-  const [device] = await db.insert(devicesTable).values({ ...parsed.data, status: "PENDING" }).returning();
-  await logAudit("create_device", device.id, null, device.macAddress);
-  res.status(201).json(await enrichDevice(device));
+  const [device] = await db.insert(devicesTable).values(parsed.data).returning();
+  res.status(201).json(device);
 });
 
 router.get("/:id", async (req, res) => {
@@ -157,16 +169,20 @@ router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const parsed = UpdateDeviceBody.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
-  const [device] = await db.update(devicesTable).set({ ...parsed.data, updatedAt: new Date() }).where(eq(devicesTable.id, id)).returning();
+  const [device] = await db.update(devicesTable).set(parsed.data).where(eq(devicesTable.id, id)).returning();
   if (!device) return res.status(404).json({ error: "Device not found" });
-  await logAudit("update_device", id, null, JSON.stringify(parsed.data));
   res.json(await enrichDevice(device));
 });
 
 router.delete("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
+  const [device] = await db.select().from(devicesTable).where(eq(devicesTable.id, id));
+  if (device) {
+    try { await removeDeviceFromRadius(device.macAddress); } catch (err) {
+      logger.warn({ deviceId: id, err }, "RADIUS removal failed during device delete");
+    }
+  }
   await db.delete(devicesTable).where(eq(devicesTable.id, id));
-  await logAudit("delete_device", id, null, null);
   res.status(204).send();
 });
 
@@ -186,15 +202,31 @@ router.post("/:id/approve", async (req, res) => {
   if (parsed.data.vlanId) updateData.vlanId = parsed.data.vlanId;
 
   const [device] = await db.update(devicesTable).set(updateData).where(eq(devicesTable.id, id)).returning();
+
+  let radiusSynced = false;
+  let radiusError: string | null = null;
+  try {
+    await syncDeviceToRadius(getPool(), device.macAddress, device.vlanId, "approve");
+    await db.update(devicesTable).set({ radiusSynced: true, status: "SYNCED" }).where(eq(devicesTable.id, id));
+    radiusSynced = true;
+    logger.info({ deviceId: id, mac: device.macAddress }, "Device approved and synced to RADIUS");
+  } catch (err) {
+    radiusError = err instanceof Error ? err.message : String(err);
+    logger.warn({ deviceId: id, mac: device.macAddress, err }, "Device approved in DB, RADIUS sync failed");
+  }
+
   await db.insert(deviceHistoryTable).values({
     deviceId: id,
     action: "approve",
     oldStatus: existing.status,
     newStatus: "APPROVED",
     performedBy: "admin",
+    notes: radiusSynced ? "RADIUS sync successful" : `RADIUS sync failed: ${radiusError}`,
   });
   await logAudit("approve_device", id, existing.status, "APPROVED");
-  res.json(await enrichDevice(device));
+
+  const enriched = await enrichDevice(device);
+  return res.json({ ...enriched, radiusSynced, radiusError });
 });
 
 router.post("/:id/reject", async (req, res) => {
@@ -204,7 +236,15 @@ router.post("/:id/reject", async (req, res) => {
   const [existing] = await db.select().from(devicesTable).where(eq(devicesTable.id, id));
   if (!existing) return res.status(404).json({ error: "Device not found" });
 
-  const [device] = await db.update(devicesTable).set({ status: "REJECTED", updatedAt: new Date() }).where(eq(devicesTable.id, id)).returning();
+  const [device] = await db.update(devicesTable).set({ status: "REJECTED", radiusSynced: false, updatedAt: new Date() }).where(eq(devicesTable.id, id)).returning();
+
+  try {
+    await removeDeviceFromRadius(existing.macAddress);
+    logger.info({ deviceId: id, mac: existing.macAddress }, "Device rejected and removed from RADIUS");
+  } catch (err) {
+    logger.warn({ deviceId: id, mac: existing.macAddress, err }, "Device rejected in DB, RADIUS removal failed");
+  }
+
   await db.insert(deviceHistoryTable).values({
     deviceId: id,
     action: "reject",
@@ -214,7 +254,7 @@ router.post("/:id/reject", async (req, res) => {
     notes: parsed.data.reason ?? null,
   });
   await logAudit("reject_device", id, existing.status, "REJECTED");
-  res.json(await enrichDevice(device));
+  return res.json(await enrichDevice(device));
 });
 
 router.post("/:id/quarantine", async (req, res) => {
@@ -222,16 +262,30 @@ router.post("/:id/quarantine", async (req, res) => {
   const [existing] = await db.select().from(devicesTable).where(eq(devicesTable.id, id));
   if (!existing) return res.status(404).json({ error: "Device not found" });
 
-  const [device] = await db.update(devicesTable).set({ status: "QUARANTINED", updatedAt: new Date() }).where(eq(devicesTable.id, id)).returning();
+  const [device] = await db.update(devicesTable).set({ status: "QUARANTINED", radiusSynced: false, updatedAt: new Date() }).where(eq(devicesTable.id, id)).returning();
+
+  let quarantineError: string | null = null;
+  try {
+    await quarantineDeviceInRadius(existing.macAddress);
+    await db.update(devicesTable).set({ radiusSynced: true }).where(eq(devicesTable.id, id));
+    logger.info({ deviceId: id, mac: existing.macAddress }, "Device quarantined in RADIUS (VLAN 999)");
+  } catch (err) {
+    quarantineError = err instanceof Error ? err.message : String(err);
+    logger.warn({ deviceId: id, mac: existing.macAddress, err }, "Device quarantined in DB, RADIUS quarantine failed");
+  }
+
   await db.insert(deviceHistoryTable).values({
     deviceId: id,
     action: "quarantine",
     oldStatus: existing.status,
     newStatus: "QUARANTINED",
     performedBy: "admin",
+    notes: quarantineError ? `RADIUS quarantine failed: ${quarantineError}` : "RADIUS quarantine set to VLAN 999",
   });
   await logAudit("quarantine_device", id, existing.status, "QUARANTINED");
-  res.json(await enrichDevice(device));
+
+  const enriched = await enrichDevice(device);
+  return res.json({ ...enriched, quarantineError });
 });
 
 router.get("/:id/history", async (req, res) => {

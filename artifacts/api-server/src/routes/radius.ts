@@ -8,6 +8,8 @@ import {
   UpdateRadiusGroupBody,
   SyncToRadiusBody,
 } from "@workspace/api-zod";
+import { syncAllApprovedDevices } from "../services/radius-sync";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -84,27 +86,16 @@ router.post("/sync", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
 
   const deviceIds = parsed.data.deviceIds;
-  let query = db.select().from(devicesTable).$dynamic();
-  if (deviceIds && deviceIds.length > 0) {
-    query = query.where(sql`${devicesTable.id} = ANY(${deviceIds})`);
-  } else {
-    query = query.where(eq(devicesTable.status, "APPROVED"));
+
+  try {
+    const result = await syncAllApprovedDevices(deviceIds && deviceIds.length > 0 ? deviceIds : undefined);
+    logger.info(result, "RADIUS sync completed via API");
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error({ err }, "RADIUS sync failed");
+    res.status(500).json({ error: `RADIUS sync failed: ${message}` });
   }
-
-  const devices = await query;
-  let synced = 0;
-  const errors: string[] = [];
-
-  for (const device of devices) {
-    try {
-      await db.update(devicesTable).set({ radiusSynced: true, status: "SYNCED" }).where(eq(devicesTable.id, device.id));
-      synced++;
-    } catch {
-      errors.push(`Failed to sync device ${device.macAddress}`);
-    }
-  }
-
-  res.json({ synced, failed: devices.length - synced, errors });
 });
 
 router.get("/sync-status", async (req, res) => {

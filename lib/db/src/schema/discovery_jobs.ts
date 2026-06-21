@@ -12,6 +12,7 @@ export const discoveryJobsTable = pgTable("discovery_jobs", {
   devicesNew: integer("devices_new").notNull().default(0),
   devicesUpdated: integer("devices_updated").notNull().default(0),
   errorMessage: text("error_message"),
+  triggeredBy: text("triggered_by"),
   startedAt: timestamp("started_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

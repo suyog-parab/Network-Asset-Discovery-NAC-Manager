@@ -1,0 +1,14 @@
+mac_auth_policy {
+	update request {
+		&User-Name := "%{tolower:%{Calling-Station-Id}}"
+		&User-Password := "%{tolower:%{Calling-Station-Id}}"
+	}
+
+	update control {
+		&Auth-Type := "MAC-Auth"
+	}
+
+	if ("%{sql:SELECT id FROM radcheck WHERE username = '%{User-Name}' AND attribute = 'Auth-Type' LIMIT 1}" == '') {
+		reject
+	}
+}

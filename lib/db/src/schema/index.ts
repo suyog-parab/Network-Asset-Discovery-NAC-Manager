@@ -11,3 +11,4 @@ export * from "./nac_policies";
 export * from "./alerts";
 export * from "./audit_logs";
 export * from "./users";
+export * from "./integration_logs";

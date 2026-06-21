@@ -1,0 +1,157 @@
+version: "3.9"
+
+services:
+  # ================================================================
+  # PostgreSQL — persistent storage for NAC data + FreeRADIUS SQL
+  # ================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: nac-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-nacuser}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME:-nacdb}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "${DB_PORT_EXPOSE:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-nacuser} -d ${DB_NAME:-nacdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - nac-internal
+
+  # ================================================================
+  # FreeRADIUS — MAB policy enforcement, SQL-backed
+  # ================================================================
+  freeradius:
+    image: freeradius/freeradius-server:3.2
+    container_name: nac-freeradius
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-nacuser}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME:-nacdb}
+      RADIUS_TEST_SECRET: ${RADIUS_TEST_SECRET:-testing123}
+    volumes:
+      - ./docker/freeradius/raddb:/etc/freeradius:ro
+      - freeradius_logs:/var/log/freeradius
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+      - "3799:3799/udp"
+    healthcheck:
+      test: ["CMD", "/bin/sh", "/etc/freeradius/scripts/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - nac-internal
+      - nac-external
+
+  # ================================================================
+  # API Server — Express 5 / Node 24
+  # ================================================================
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: nac-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      DATABASE_URL: postgresql://${DB_USER:-nacuser}:${DB_PASS}@postgres:5432/${DB_NAME:-nacdb}
+      SESSION_SECRET: ${SESSION_SECRET}
+      FREERADIUS_HOST: freeradius
+      FREERADIUS_PORT: 1812
+      FREERADIUS_COA_PORT: 3799
+      RADIUS_SECRET: ${RADIUS_SECRET}
+      RADIUS_TEST_SECRET: ${RADIUS_TEST_SECRET:-testing123}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - api_logs:/app/logs
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - nac-internal
+
+  # ================================================================
+  # Frontend — Vite build served by nginx
+  # ================================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: nac-frontend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/index.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - nac-internal
+
+  # ================================================================
+  # Nginx — Reverse proxy routing /api → api, / → frontend
+  # ================================================================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: nac-nginx
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - nac-internal
+      - nac-external
+
+volumes:
+  postgres_data:
+    driver: local
+  freeradius_logs:
+    driver: local
+  api_logs:
+    driver: local
+
+networks:
+  nac-internal:
+    driver: bridge
+    internal: true
+  nac-external:
+    driver: bridge

@@ -8,7 +8,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, CheckCircle2 } from "lucide-react";
+import { Check, CheckCircle2, ChevronLeft, ChevronRight, Bell } from "lucide-react";
+
+const SEVERITY_BADGE = {
+  critical: <Badge variant="destructive">Critical</Badge>,
+  warning: <Badge className="bg-amber-500 hover:bg-amber-600">Warning</Badge>,
+  info: <Badge variant="secondary">Info</Badge>,
+};
+
+const STATUS_STYLE: Record<string, string> = {
+  open: "bg-destructive/15 text-destructive border-destructive/20",
+  acknowledged: "bg-amber-500/15 text-amber-500 border-amber-500/20",
+  resolved: "bg-green-500/15 text-green-500 border-green-500/20",
+};
 
 export default function Alerts() {
   const [page, setPage] = useState(1);
@@ -16,70 +28,53 @@ export default function Alerts() {
   const [severity, setSeverity] = useState<AlertSeverity | "ALL">("ALL");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const limit = 50;
 
   const { data, isLoading } = useListAlerts({
-    page,
-    limit: 50,
+    page, limit,
     status: status === "ALL" ? undefined : status,
-    severity: severity === "ALL" ? undefined : severity
+    severity: severity === "ALL" ? undefined : severity,
   });
 
-  const ackMutation = useAcknowledgeAlert({
-    mutation: {
-      onSuccess: () => {
-        toast({ title: "Alert acknowledged" });
-        queryClient.invalidateQueries({ queryKey: ["/api/alerts"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/alerts/counts"] });
-      }
-    }
-  });
-
-  const resolveMutation = useResolveAlert({
-    mutation: {
-      onSuccess: () => {
-        toast({ title: "Alert resolved" });
-        queryClient.invalidateQueries({ queryKey: ["/api/alerts"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/alerts/counts"] });
-      }
-    }
-  });
-
-  const getSeverityBadge = (s: string) => {
-    switch (s) {
-      case 'critical': return <Badge variant="destructive">Critical</Badge>;
-      case 'warning': return <Badge variant="default" className="bg-amber-500 hover:bg-amber-600">Warning</Badge>;
-      default: return <Badge variant="secondary">Info</Badge>;
-    }
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/alerts"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/alerts/counts"] });
   };
+
+  const ackMut = useAcknowledgeAlert({ mutation: { onSuccess: () => { toast({ title: "Alert acknowledged" }); invalidate(); } } });
+  const resolveMut = useResolveAlert({ mutation: { onSuccess: () => { toast({ title: "Alert resolved" }); invalidate(); } } });
+
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / limit);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">Alerts</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Alerts</h1>
+          <p className="text-muted-foreground text-sm mt-1">{total} total alerts</p>
+        </div>
+        <Bell className="h-6 w-6 text-muted-foreground" />
       </div>
 
       <div className="flex gap-4">
-        <Select value={status} onValueChange={(val: any) => setStatus(val)}>
+        <Select value={status} onValueChange={(val: string) => { setStatus(val as AlertStatus | "ALL"); setPage(1); }}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All Statuses</SelectItem>
-            {Object.values(AlertStatus).map(s => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
-            ))}
+            {Object.values(AlertStatus).map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
           </SelectContent>
         </Select>
 
-        <Select value={severity} onValueChange={(val: any) => setSeverity(val)}>
+        <Select value={severity} onValueChange={(val: string) => { setSeverity(val as AlertSeverity | "ALL"); setPage(1); }}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Severity" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All Severities</SelectItem>
-            {Object.values(AlertSeverity).map(s => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
-            ))}
+            {Object.values(AlertSeverity).map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -89,70 +84,60 @@ export default function Alerts() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Severity</TableHead>
+                <TableHead className="w-24">Severity</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Message</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="w-28">Status</TableHead>
+                <TableHead className="w-36">Time</TableHead>
+                <TableHead className="w-36">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-64" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-24" /></TableCell>
-                  </TableRow>
+                Array.from({ length: 8 }).map((_, i) => (
+                  <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}</TableRow>
                 ))
               ) : data?.data && data.data.length > 0 ? (
                 data.data.map(alert => (
-                  <TableRow key={alert.id} className={alert.status === 'open' ? 'bg-muted/30' : ''}>
-                    <TableCell>{getSeverityBadge(alert.severity)}</TableCell>
+                  <TableRow key={alert.id} className={alert.status === 'open' ? "bg-muted/20" : ""}>
+                    <TableCell>
+                      {SEVERITY_BADGE[alert.severity as keyof typeof SEVERITY_BADGE] || <Badge variant="secondary">{alert.severity}</Badge>}
+                    </TableCell>
                     <TableCell className="font-mono text-xs">{alert.type}</TableCell>
                     <TableCell>
-                      <span className="font-medium">{alert.message}</span>
+                      <p className="font-medium text-sm">{alert.message}</p>
                       {alert.device && (
-                        <span className="block text-xs text-muted-foreground mt-1">
-                          Device: {alert.device.macAddress}
-                        </span>
+                        <p className="text-xs text-muted-foreground mt-0.5">Device: {alert.device.macAddress}</p>
                       )}
                     </TableCell>
                     <TableCell>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        alert.status === 'open' ? 'bg-destructive/20 text-destructive' :
-                        alert.status === 'acknowledged' ? 'bg-amber-500/20 text-amber-500' :
-                        'bg-primary/20 text-primary'
-                      }`}>
+                      <span className={`text-xs px-2 py-1 rounded-full border ${STATUS_STYLE[alert.status] ?? ""}`}>
                         {alert.status}
                       </span>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                       {new Date(alert.createdAt).toLocaleString()}
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1.5">
                         {alert.status === 'open' && (
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => ackMutation.mutate({ id: alert.id })}
-                            disabled={ackMutation.isPending}
+                          <Button
+                            size="sm" variant="outline"
+                            onClick={() => ackMut.mutate({ id: alert.id })}
+                            disabled={ackMut.isPending}
+                            title="Acknowledge"
                           >
-                            <Check className="h-4 w-4 mr-1" /> Ack
+                            <Check className="h-3.5 w-3.5 mr-1" /> Ack
                           </Button>
                         )}
                         {alert.status !== 'resolved' && (
-                          <Button 
-                            size="sm" 
-                            onClick={() => resolveMutation.mutate({ id: alert.id })}
-                            disabled={resolveMutation.isPending}
+                          <Button
+                            size="sm"
+                            onClick={() => resolveMut.mutate({ id: alert.id })}
+                            disabled={resolveMut.isPending}
+                            title="Resolve"
                           >
-                            <CheckCircle2 className="h-4 w-4 mr-1" /> Resolve
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Resolve
                           </Button>
                         )}
                       </div>
@@ -161,7 +146,7 @@ export default function Alerts() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     No alerts found.
                   </TableCell>
                 </TableRow>
@@ -170,6 +155,20 @@ export default function Alerts() {
           </Table>
         </CardContent>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2">
+          <div className="text-sm text-muted-foreground">Page {page} of {totalPages}</div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
